@@ -2,14 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+/* ── Google Fonts: Bodoni Moda (luxury serif) + Jost (clean sans) ─────────── */
+@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,600;0,6..96,700;0,6..96,900;1,6..96,400;1,6..96,500&family=Jost:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&display=swap');
 
 :root {
-  --brand-red: #E01F54;
+  --brand-red:  #E01F54;
   --brand-teal: #007791;
   --text-primary: #1A1A1A;
-  --bg-primary: #FFFFFF;
-  --bg-secondary: #F7F7F7;
+  --bg-primary:   #FFFFFF;
+  --bg-secondary: #F5F4F2;
+  --font-serif: 'Bodoni Moda', 'Georgia', serif;
+  --font-sans:  'Jost', system-ui, sans-serif;
 }
 
 * {
@@ -23,28 +26,25 @@ html {
 }
 
 body {
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: var(--font-sans);
   color: var(--text-primary);
   background-color: var(--bg-primary);
+  font-weight: 400;
+  letter-spacing: 0.01em;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+/* ── Serif utility ─────────────────────────────────────────────────────────── */
+.font-serif-display {
+  font-family: var(--font-serif);
 }
 
-/* Product grid animations */
+/* ── Custom scrollbar ──────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #aaa; }
+
+/* ── Product card ──────────────────────────────────────────────────────────── */
 .product-card {
   @apply transition-all duration-300 ease-out;
 }
@@ -52,29 +52,30 @@ body {
   @apply scale-105;
 }
 
-/* Sticky cart button on mobile PDP */
+/* ── Sticky mobile CTA ────────────────────────────────────────────────────── */
 .sticky-cta {
   position: sticky;
   bottom: 0;
   z-index: 40;
 }
 
-/* Line clamp utilities */
-.line-clamp-1 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
-.line-clamp-2 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.line-clamp-3 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+/* ── Line-clamp ────────────────────────────────────────────────────────────── */
+.line-clamp-1 { overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; }
+.line-clamp-2 { overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.line-clamp-3 { overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; }
 
-/* Swiper overrides */
-.swiper-pagination-bullet-active {
-  background: var(--brand-red) !important;
-}
-.swiper-button-next, .swiper-button-prev {
-  color: var(--brand-red) !important;
-}
+/* ── Swiper overrides ──────────────────────────────────────────────────────── */
+.swiper-pagination-bullet-active { background: var(--brand-red) !important; }
+.swiper-button-next, .swiper-button-prev { color: var(--brand-red) !important; }
 
-/* Focus styles */
+/* ── Focus ─────────────────────────────────────────────────────────────────── */
 *:focus-visible {
   outline: 2px solid var(--brand-teal);
   outline-offset: 2px;
 }
 
+/* ── Editorial heading sizes ──────────────────────────────────────────────── */
+.display-xl  { font-size: clamp(3.5rem, 12vw, 10rem); line-height: 0.95; letter-spacing: -0.02em; }
+.display-lg  { font-size: clamp(2.5rem,  8vw,  7rem); line-height: 1.0;  letter-spacing: -0.02em; }
+.display-md  { font-size: clamp(1.8rem,  5vw,  4rem); line-height: 1.05; letter-spacing: -0.01em; }
+.section-tag { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.45em; text-transform: uppercase; }
