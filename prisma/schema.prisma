@@ -1,0 +1,267 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id              String   @id @default(cuid())
+  skuPrefix       String   @unique
+  name            String
+  slug            String   @unique
+  descriptionShort String?
+  descriptionLong  String?
+  basePrice       Decimal  @db.Decimal(10, 2)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  defaultImageId  String?
+
+  variants         ProductVariant[]
+  images           ProductImage[]
+  categories       ProductCategoryMap[]
+  attributes       ProductAttributeMap[]
+  merchandisingItems MerchandisingItem[]
+  promotions       ProductPromotionMap[]
+  orderItems       OrderItem[]
+
+  @@index([slug])
+  @@index([isActive])
+}
+
+model ProductVariant {
+  id               String   @id @default(cuid())
+  productId        String
+  sku              String   @unique
+  variantName      String
+  sizeValue        String?
+  colorValue       String?
+  priceModifier    Decimal? @db.Decimal(10, 2)
+  currentStock     Int      @default(0)
+  lowStockThreshold Int     @default(5)
+  isAvailable      Boolean  @default(true)
+  weightGrams      Int?
+
+  product   Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@index([productId])
+  @@index([sku])
+  @@index([sizeValue])
+  @@index([colorValue])
+}
+
+model ProductImage {
+  id          String  @id @default(cuid())
+  productId   String
+  urlMain     String
+  urlThumbnail String
+  urlZoom     String?
+  sortOrder   Int     @default(0)
+  is360View   Boolean @default(false)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model Category {
+  id           Int       @id @default(autoincrement())
+  name         String
+  slug         String    @unique
+  parentId     Int?
+  displayOrder Int       @default(0)
+  imageUrl     String?
+
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+  products ProductCategoryMap[]
+
+  @@index([slug])
+  @@index([parentId])
+}
+
+model ProductCategoryMap {
+  productId  String
+  categoryId Int
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+  @@index([categoryId])
+}
+
+model AttributeDefinition {
+  id             Int             @id @default(autoincrement())
+  name           String          @unique
+  filterableType FilterableType  @default(FACET)
+
+  values AttributeValue[]
+}
+
+enum FilterableType {
+  FACET
+  SEARCH_ONLY
+  MERCH
+}
+
+model AttributeValue {
+  id                 Int     @id @default(autoincrement())
+  attributeDefId     Int
+  value              String
+  standardizedGroup  String?
+
+  definition AttributeDefinition  @relation(fields: [attributeDefId], references: [id], onDelete: Cascade)
+  products   ProductAttributeMap[]
+
+  @@index([attributeDefId])
+}
+
+model ProductAttributeMap {
+  productId        String
+  attributeValueId Int
+
+  product        Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attributeValue AttributeValue @relation(fields: [attributeValueId], references: [id], onDelete: Cascade)
+
+  @@id([productId, attributeValueId])
+}
+
+model MerchandisingSlot {
+  id          Int          @id @default(autoincrement())
+  name        String
+  maxItems    Int          @default(12)
+  displayRule DisplayRule  @default(MANUAL)
+  isEnabled   Boolean      @default(true)
+  sortOrder   Int          @default(0)
+
+  items MerchandisingItem[]
+}
+
+enum DisplayRule {
+  MANUAL
+  DYNAMIC_NEWEST
+  DYNAMIC_SALE
+}
+
+model MerchandisingItem {
+  id          Int      @id @default(autoincrement())
+  slotId      Int
+  productId   String
+  manualOrder Int      @default(0)
+  addedAt     DateTime @default(now())
+
+  slot    MerchandisingSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  product Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([slotId])
+}
+
+model Promotion {
+  id                  Int           @id @default(autoincrement())
+  name                String
+  type                PromotionType
+  discountValue       Decimal       @db.Decimal(5, 2)
+  startDate           DateTime?
+  endDate             DateTime?
+  eligibilityCriteria Json?
+  isActive            Boolean       @default(true)
+  code                String?       @unique
+
+  products ProductPromotionMap[]
+}
+
+enum PromotionType {
+  PERCENT_OFF
+  FIXED_AMOUNT
+  BUNDLE
+}
+
+model ProductPromotionMap {
+  promotionId Int
+  productId   String
+
+  promotion Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([promotionId, productId])
+}
+
+model Customer {
+  id           String  @id @default(cuid())
+  sessionToken String? @unique
+  email        String? @unique
+  name         String?
+  createdAt    DateTime @default(now())
+
+  addresses ShippingAddress[]
+  orders    Order[]
+}
+
+model ShippingAddress {
+  id          String  @id @default(cuid())
+  customerId  String?
+  firstName   String
+  lastName    String
+  street      String
+  street2     String?
+  zipCode     String
+  city        String
+  countryCode String  @default("CH")
+
+  customer Customer? @relation(fields: [customerId], references: [id])
+  orders   Order[]
+}
+
+model Order {
+  id                String      @id @default(cuid())
+  customerId        String?
+  shippingAddressId String
+  orderDate         DateTime    @default(now())
+  status            OrderStatus @default(PENDING)
+  subtotalChf       Decimal     @db.Decimal(10, 2)
+  shippingCostChf   Decimal     @db.Decimal(10, 2) @default(5.00)
+  taxRateApplied    Decimal     @db.Decimal(4, 4)  @default(0.0810)
+  totalTaxChf       Decimal     @db.Decimal(10, 2)
+  totalGrandChf     Decimal     @db.Decimal(10, 2)
+  paymentMethod     String?
+  stripePaymentId   String?
+  notes             String?
+
+  customer        Customer?       @relation(fields: [customerId], references: [id])
+  shippingAddress ShippingAddress @relation(fields: [shippingAddressId], references: [id])
+  items           OrderItem[]
+
+  @@index([customerId])
+  @@index([status])
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model OrderItem {
+  id            String  @id @default(cuid())
+  orderId       String
+  variantId     String
+  productId     String
+  quantity      Int
+  unitPricePaid Decimal @db.Decimal(10, 2)
+  lineTotalPaid Decimal @db.Decimal(10, 2)
+  productName   String
+  variantName   String
+
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id])
+  product Product        @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+}
