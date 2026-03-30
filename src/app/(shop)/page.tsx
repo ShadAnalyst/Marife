@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef } from 'react';
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
+import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion';
 import Link from 'next/link';
 import { ArrowRightIcon } from '@heroicons/react/24/outline';
 import type { MockProduct } from '@/lib/mockData';
@@ -11,7 +11,7 @@ import { useMergedCategories, useProductsByCategory, type MergedCategory } from 
 
 // ─── Artistic hero ────────────────────────────────────────────────────────────
 
-function MarifeHero() {
+function MarifeHero({ compactMotion }: { compactMotion: boolean }) {
   const heroRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: heroRef,
@@ -24,10 +24,10 @@ function MarifeHero() {
   return (
     <div ref={heroRef} className="relative h-screen w-full overflow-hidden bg-[#080808]">
       {/* ── WebGL shader layer (always full-screen, behind everything) ── */}
-      <ShaderAnimation />
+      <ShaderAnimation lowPower={compactMotion} />
 
       <motion.div
-        style={{ opacity, scale }}
+        style={{ opacity: compactMotion ? 1 : opacity, scale: compactMotion ? 1 : scale }}
         className="absolute inset-0 flex flex-col items-center justify-center"
       >
         {/* Subtle radial overlay so text stays readable over shader */}
@@ -36,9 +36,9 @@ function MarifeHero() {
         <div className="relative flex flex-col items-center text-center px-6">
           {/* Top label */}
           <motion.p
-            initial={{ opacity: 0, y: -12 }}
+            initial={compactMotion ? false : { opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.2, delay: 0.2 }}
+            transition={compactMotion ? { duration: 0.2 } : { duration: 1.2, delay: 0.2 }}
             className="text-[#E01F54] text-[9px] md:text-[10px] font-semibold tracking-[0.55em] uppercase mb-9"
           >
             Dessous &amp; Korsett
@@ -47,9 +47,9 @@ function MarifeHero() {
           {/* MARIFE logotype */}
           <div className="overflow-hidden">
             <motion.h1
-              initial={{ y: '105%' }}
+              initial={compactMotion ? false : { y: '105%' }}
               animate={{ y: 0 }}
-              transition={{ duration: 1.1, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+              transition={compactMotion ? { duration: 0.2 } : { duration: 1.1, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
               className="text-white leading-none select-none"
               style={{
                 fontSize: 'clamp(4.5rem, 17vw, 17rem)',
@@ -64,18 +64,18 @@ function MarifeHero() {
 
           {/* Animated divider line */}
           <motion.div
-            initial={{ scaleX: 0 }}
+            initial={compactMotion ? false : { scaleX: 0 }}
             animate={{ scaleX: 1 }}
-            transition={{ duration: 1.4, delay: 0.7 }}
+            transition={compactMotion ? { duration: 0.2 } : { duration: 1.4, delay: 0.7 }}
             style={{ transformOrigin: 'center' }}
             className="w-full max-w-xs mt-7 h-px bg-gradient-to-r from-transparent via-[#E01F54] to-transparent"
           />
 
           {/* Sub-label */}
           <motion.p
-            initial={{ opacity: 0, y: 14 }}
+            initial={compactMotion ? false : { opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, delay: 1.1 }}
+            transition={compactMotion ? { duration: 0.2 } : { duration: 0.9, delay: 1.1 }}
             className="text-white/35 text-[10px] font-light tracking-[0.38em] mt-6 uppercase"
           >
             Switzerland · Collection 2025
@@ -83,15 +83,15 @@ function MarifeHero() {
 
           {/* Decorative rings */}
           <motion.div
-            initial={{ opacity: 0 }}
+            initial={compactMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 2.5, delay: 1.5 }}
+            transition={compactMotion ? { duration: 0.2 } : { duration: 2.5, delay: 1.5 }}
             className="absolute -top-28 -left-28 w-56 h-56 border border-[#007791]/15 rounded-full pointer-events-none"
           />
           <motion.div
-            initial={{ opacity: 0 }}
+            initial={compactMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 2.5, delay: 1.7 }}
+            transition={compactMotion ? { duration: 0.2 } : { duration: 2.5, delay: 1.7 }}
             className="absolute -bottom-28 -right-28 w-72 h-72 border border-[#E01F54]/15 rounded-full pointer-events-none"
           />
         </div>
@@ -99,12 +99,12 @@ function MarifeHero() {
 
       {/* Scroll indicator */}
       <motion.div
-        style={{ opacity }}
+        style={{ opacity: compactMotion ? 0.9 : opacity }}
         className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
       >
         <motion.div
-          animate={{ y: [0, 7, 0] }}
-          transition={{ duration: 2.3, repeat: Infinity, ease: 'easeInOut' }}
+          animate={compactMotion ? { y: 0 } : { y: [0, 7, 0] }}
+          transition={compactMotion ? { duration: 0.2 } : { duration: 2.3, repeat: Infinity, ease: 'easeInOut' }}
           className="flex flex-col items-center gap-2"
         >
           <span className="text-white/25 text-[8px] tracking-[0.45em] uppercase font-light">Scroll</span>
@@ -121,10 +121,12 @@ function ScrollExpandSection({
   category,
   index,
   totalCategories,
+  compactMotion,
 }: {
   category: MergedCategory;
   index: number;
   totalCategories: number;
+  compactMotion: boolean;
 }) {
   const sectionRef = useRef<HTMLDivElement>(null);
   const products = useProductsByCategory(category.slug);
@@ -138,20 +140,20 @@ function ScrollExpandSection({
   const p = scrollYProgress;
 
   // Image card expansion: small pill → full screen
-  const cardWidth        = useTransform(p, [0, 0.28, 0.48], ['42%', '100%', '100%']);
-  const cardHeight       = useTransform(p, [0, 0.28, 0.48], ['58vh', '100vh', '100vh']);
-  const cardBorderRadius = useTransform(p, [0, 0.28], ['18px', '0px']);
+  const cardWidth        = useTransform(p, compactMotion ? [0, 1] : [0, 0.28, 0.48], compactMotion ? ['100%', '100%'] : ['42%', '100%', '100%']);
+  const cardHeight       = useTransform(p, compactMotion ? [0, 1] : [0, 0.28, 0.48], compactMotion ? ['100vh', '100vh'] : ['58vh', '100vh', '100vh']);
+  const cardBorderRadius = useTransform(p, compactMotion ? [0, 1] : [0, 0.28], compactMotion ? ['0px', '0px'] : ['18px', '0px']);
   // Scale only the hero layer — never the product grid (scaling the whole card made items look half-hidden).
-  const cardScale        = useTransform(p, [0, 0.28], [0.58, 1]);
+  const cardScale        = useTransform(p, compactMotion ? [0, 1] : [0, 0.28], compactMotion ? [1, 1] : [0.58, 1]);
 
   // Text transitions
-  const titleOpacity    = useTransform(p, [0.28, 0.46], [1, 0]);
+  const titleOpacity    = useTransform(p, compactMotion ? [0, 0.2] : [0.28, 0.46], [1, 0]);
   // Ramp to full opacity quickly — avoid a long 0.6 plateau that reads as “half visible”
-  const productsOpacity = useTransform(p, [0.4, 0.52, 0.66], [0, 1, 1]);
+  const productsOpacity = useTransform(p, compactMotion ? [0, 0.1, 1] : [0.4, 0.52, 0.66], compactMotion ? [1, 1, 1] : [0, 1, 1]);
 
   return (
     // 200vh gives enough scroll travel for the sticky expansion animation
-    <div ref={sectionRef} className="relative h-[200vh] w-full">
+    <div ref={sectionRef} className={`relative w-full ${compactMotion ? 'h-[140vh]' : 'h-[200vh]'}`}>
       <div className="sticky top-0 h-screen w-full flex items-center justify-center overflow-hidden bg-[#080808]">
         <motion.div
           style={{
@@ -199,8 +201,8 @@ function ScrollExpandSection({
             <div className="mt-10 flex flex-col items-center gap-1.5">
               <span className="text-white/25 text-[7px] tracking-[0.4em] uppercase">scroll</span>
               <motion.div
-                animate={{ y: [0, 5, 0] }}
-                transition={{ duration: 1.8, repeat: Infinity }}
+                animate={compactMotion ? { y: 0 } : { y: [0, 5, 0] }}
+                transition={compactMotion ? { duration: 0.2 } : { duration: 1.8, repeat: Infinity }}
                 className="w-px h-7 bg-gradient-to-b from-white/25 to-transparent"
               />
             </div>
@@ -239,9 +241,9 @@ function ScrollExpandSection({
                   {products.slice(0, 4).map((product, i) => (
                     <motion.div
                       key={product.id}
-                      initial={{ opacity: 0, y: 12 }}
+                      initial={compactMotion ? false : { opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.06, duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
+                      transition={compactMotion ? { duration: 0.2 } : { delay: i * 0.06, duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
                     >
                       <ProductCard product={product} />
                     </motion.div>
@@ -271,10 +273,22 @@ function ScrollExpandSection({
 
 export default function HomePage() {
   const categories = useMergedCategories();
+  const prefersReducedMotion = useReducedMotion();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 768px)');
+    const update = () => setIsMobile(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+
+  const compactMotion = Boolean(prefersReducedMotion) || isMobile;
 
   return (
     <div className="bg-[#080808]">
-      <MarifeHero />
+      <MarifeHero compactMotion={compactMotion} />
 
       {categories.map((cat, i) => (
         <ScrollExpandSection
@@ -282,6 +296,7 @@ export default function HomePage() {
           category={cat}
           index={i}
           totalCategories={categories.length}
+          compactMotion={compactMotion}
         />
       ))}
 

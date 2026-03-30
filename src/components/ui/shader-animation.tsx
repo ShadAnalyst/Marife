@@ -141,16 +141,18 @@ function createProgram(gl: WebGLRenderingContext, vert: string, frag: string) {
 interface ShaderAnimationProps {
   /** Extra Tailwind / CSS classes on the canvas wrapper */
   className?: string;
+  /** Use lighter rendering for mobile/reduced-motion contexts */
+  lowPower?: boolean;
 }
 
-export default function ShaderAnimation({ className = '' }: ShaderAnimationProps) {
+export default function ShaderAnimation({ className = '', lowPower = false }: ShaderAnimationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const gl = canvas.getContext('webgl', { antialias: false, alpha: false });
+    const gl = canvas.getContext('webgl', { antialias: false, alpha: false, powerPreference: lowPower ? 'low-power' : 'high-performance' });
     if (!gl) return; // silently fall back — the dark bg-[#080808] shows instead
 
     // ── Program ──────────────────────────────────────────────────────────────
@@ -174,7 +176,8 @@ export default function ShaderAnimation({ className = '' }: ShaderAnimationProps
 
     // ── Resize handler ───────────────────────────────────────────────────────
     const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio, 2);
+      const dprCap = lowPower ? 1 : 2;
+      const dpr = Math.min(window.devicePixelRatio, dprCap);
       canvas.width  = canvas.clientWidth  * dpr;
       canvas.height = canvas.clientHeight * dpr;
       gl.viewport(0, 0, canvas.width, canvas.height);
@@ -186,15 +189,20 @@ export default function ShaderAnimation({ className = '' }: ShaderAnimationProps
     // ── Animation loop ───────────────────────────────────────────────────────
     let raf = 0;
     const start = performance.now();
+    const frameInterval = lowPower ? 1000 / 30 : 1000 / 60;
+    let lastFrame = 0;
 
-    const render = () => {
+    const render = (now: number) => {
+      raf = requestAnimationFrame(render);
+      if (document.hidden) return;
+      if (now - lastFrame < frameInterval) return;
+      lastFrame = now;
       const t = (performance.now() - start) / 1000;
       gl.uniform1f(uTime, t);
       gl.uniform2f(uRes, canvas.width, canvas.height);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      raf = requestAnimationFrame(render);
     };
-    render();
+    raf = requestAnimationFrame(render);
 
     // ── Cleanup ──────────────────────────────────────────────────────────────
     return () => {
@@ -203,7 +211,7 @@ export default function ShaderAnimation({ className = '' }: ShaderAnimationProps
       gl.deleteProgram(program);
       gl.deleteBuffer(buf);
     };
-  }, []);
+  }, [lowPower]);
 
   return (
     <canvas
