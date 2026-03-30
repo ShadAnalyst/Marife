@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
-import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import Link from 'next/link';
 import { ArrowRightIcon } from '@heroicons/react/24/outline';
 import type { MockProduct } from '@/lib/mockData';
@@ -134,18 +134,20 @@ function ScrollExpandSection({
     offset: ['start end', 'end start'],
   });
 
-  // Spring-smoothed scroll value for buttery transitions
-  const smooth = useSpring(scrollYProgress, { stiffness: 75, damping: 22, restDelta: 0.001 });
+  // Direct scroll progress (no spring) — matches wheel/touch on Vercel and avoids rubbery jank.
+  const p = scrollYProgress;
 
   // Image card expansion: small pill → full screen
-  const cardWidth        = useTransform(smooth, [0, 0.28, 0.48], ['42%', '100%', '100%']);
-  const cardHeight       = useTransform(smooth, [0, 0.28, 0.48], ['58vh', '100vh', '100vh']);
-  const cardBorderRadius = useTransform(smooth, [0, 0.28], ['18px', '0px']);
-  const cardScale        = useTransform(smooth, [0, 0.28], [0.58, 1]);
+  const cardWidth        = useTransform(p, [0, 0.28, 0.48], ['42%', '100%', '100%']);
+  const cardHeight       = useTransform(p, [0, 0.28, 0.48], ['58vh', '100vh', '100vh']);
+  const cardBorderRadius = useTransform(p, [0, 0.28], ['18px', '0px']);
+  // Scale only the hero layer — never the product grid (scaling the whole card made items look half-hidden).
+  const cardScale        = useTransform(p, [0, 0.28], [0.58, 1]);
 
   // Text transitions
-  const titleOpacity    = useTransform(smooth, [0.28, 0.46], [1, 0]);
-  const productsOpacity = useTransform(smooth, [0.42, 0.65, 0.82], [0, 0.6, 1]);
+  const titleOpacity    = useTransform(p, [0.28, 0.46], [1, 0]);
+  // Ramp to full opacity quickly — avoid a long 0.6 plateau that reads as “half visible”
+  const productsOpacity = useTransform(p, [0.4, 0.52, 0.66], [0, 1, 1]);
 
   return (
     // 200vh gives enough scroll travel for the sticky expansion animation
@@ -156,17 +158,20 @@ function ScrollExpandSection({
             width: cardWidth,
             height: cardHeight,
             borderRadius: cardBorderRadius,
-            scale: cardScale,
           }}
-          className="relative overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.6)]"
+          className="relative overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.6)] [contain:layout_paint]"
         >
-          {/* Background image (CSS background so it spans the full card) */}
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(${category.imageUrl})` }}
+          {/* Background + title: scaled for the “pill → full” effect — not the product grid */}
+          <motion.div
+            style={{ scale: cardScale }}
+            className="absolute inset-0 origin-center will-change-transform"
           >
-            <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/25 to-black/75" />
-          </div>
+            <div
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ backgroundImage: `url(${category.imageUrl})` }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/25 to-black/75" />
+            </div>
 
           {/* ── Title overlay (visible while small, fades out when full-screen) ── */}
           <motion.div
@@ -200,11 +205,12 @@ function ScrollExpandSection({
               />
             </div>
           </motion.div>
+          </motion.div>
 
-          {/* ── Products (fades in once fully expanded) ── */}
+          {/* ── Products (fades in once fully expanded; not scaled with hero) ── */}
           <motion.div
             style={{ opacity: productsOpacity }}
-            className="absolute inset-0 overflow-y-auto"
+            className="absolute inset-0 z-10 overflow-y-auto overflow-x-hidden"
           >
             <div className="min-h-screen flex items-start justify-center px-5 pt-14 pb-16 md:px-14 md:pt-16">
               <div className="w-full max-w-7xl">
@@ -233,10 +239,9 @@ function ScrollExpandSection({
                   {products.slice(0, 4).map((product, i) => (
                     <motion.div
                       key={product.id}
-                      initial={{ opacity: 0, y: 22 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.09, duration: 0.45 }}
-                      viewport={{ once: true }}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.06, duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
                     >
                       <ProductCard product={product} />
                     </motion.div>
