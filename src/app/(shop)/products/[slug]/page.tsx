@@ -1,17 +1,19 @@
 import { Metadata } from "next";
-import { MOCK_PRODUCTS } from "@/lib/mockData";
+import { notFound } from "next/navigation";
 import { PDPClient } from "@/components/product/PDPClient";
-import { ResolveCustomProduct } from "@/components/product/ResolveCustomProduct";
+import { getProductBySlug, getRelatedProducts } from "@/lib/catalog-server";
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
 export const dynamicParams = true;
+/** Avoid Prisma at build time when DATABASE_URL is set but the DB is not reachable (e.g. local CI). */
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const product = MOCK_PRODUCTS.find((p) => p.slug === slug);
+  const product = await getProductBySlug(slug);
   if (!product) {
     return { title: "Product — Marife" };
   }
@@ -24,22 +26,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export async function generateStaticParams() {
-  return MOCK_PRODUCTS.map((p) => ({ slug: p.slug }));
-}
-
 export default async function ProductPage({ params }: Props) {
   const { slug } = await params;
-  const product = MOCK_PRODUCTS.find((p) => p.slug === slug);
+  const product = await getProductBySlug(slug);
   if (!product) {
-    return <ResolveCustomProduct slug={slug} />;
+    notFound();
   }
 
-  const related = MOCK_PRODUCTS.filter(
-    (p) => p.id !== product.id && p.category === product.category
-  ).slice(0, 4);
+  const related = await getRelatedProducts(product);
 
-  return (
-    <PDPClient product={product} relatedProducts={related} categorySlug={product.category} />
-  );
+  return <PDPClient product={product} relatedProducts={related} categorySlug={product.category} />;
 }

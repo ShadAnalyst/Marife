@@ -1,18 +1,14 @@
+"use client";
+
 import Link from "next/link";
+import { useMemo } from "react";
 import {
   ShoppingBagIcon,
   TagIcon,
   CurrencyDollarIcon,
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
-import { MOCK_PRODUCTS } from "@/lib/mockData";
-
-const stats = [
-  { label: "Total Products", value: "2,847", icon: TagIcon, color: "#007791", change: "+12 this week" },
-  { label: "Active Orders", value: "143", icon: ShoppingBagIcon, color: "#E01F54", change: "+28 today" },
-  { label: "Revenue (MTD)", value: "CHF 18,420", icon: CurrencyDollarIcon, color: "#28A745", change: "+15.3%" },
-  { label: "Low Stock Alerts", value: "23", icon: ExclamationTriangleIcon, color: "#FFC107", change: "Action needed" },
-];
+import { useMergedProducts } from "@/lib/useMergedCatalog";
 
 const recentOrders = [
   { id: "MRF-001A2B", customer: "Anna M.", total: "CHF 89.95", status: "Processing", date: "Today 14:22" },
@@ -30,15 +26,37 @@ const statusColors: Record<string, string> = {
 };
 
 export default function AdminDashboard() {
-  const lowStockProducts = MOCK_PRODUCTS.filter((p) =>
-    p.variants.some((v) => v.isAvailable && v.currentStock > 0 && v.currentStock <= 5)
+  const products = useMergedProducts();
+
+  const lowStockProducts = useMemo(
+    () =>
+      products.filter((p) =>
+        p.variants.some((v) => v.isAvailable && v.currentStock > 0 && v.currentStock <= 5)
+      ),
+    [products]
+  );
+
+  const stats = useMemo(
+    () => [
+      { label: "Total Products", value: String(products.length), icon: TagIcon, color: "#007791", change: "From database" },
+      { label: "Active Orders", value: "—", icon: ShoppingBagIcon, color: "#E01F54", change: "See Orders page" },
+      { label: "Revenue (MTD)", value: "—", icon: CurrencyDollarIcon, color: "#28A745", change: "Connect analytics" },
+      {
+        label: "Low Stock Alerts",
+        value: String(lowStockProducts.length),
+        icon: ExclamationTriangleIcon,
+        color: "#FFC107",
+        change: "Action needed",
+      },
+    ],
+    [products.length, lowStockProducts.length]
   );
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-[#1A1A1A]">Dashboard</h2>
-        <p className="text-sm text-gray-500 mt-1">Welcome back — here's what's happening today.</p>
+        <p className="text-sm text-gray-500 mt-1">Welcome back — here&apos;s what&apos;s happening today.</p>
       </div>
 
       {/* Stats grid */}

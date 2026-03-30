@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { useProductsByCategory } from "@/lib/useMergedCatalog";
-import { useCatalogExtensionsStore } from "@/store/useCatalogExtensionsStore";
+import { useMemo } from "react";
+import { useMergedProducts } from "@/lib/useMergedCatalog";
+import { useCatalogStore } from "@/store/useCatalogStore";
 
 export function CategoryProductsAdmin({ categorySlug }: { categorySlug: string }) {
-  const products = useProductsByCategory(categorySlug);
-  const deleteProduct = useCatalogExtensionsStore((s) => s.deleteProduct);
+  const all = useMergedProducts();
+  const products = useMemo(() => all.filter((p) => p.category === categorySlug), [all, categorySlug]);
+  const refresh = useCatalogStore((s) => s.refresh);
 
   if (products.length === 0) {
     return <p className="text-xs text-gray-400 py-2">No products in this category.</p>;
@@ -29,10 +31,16 @@ export function CategoryProductsAdmin({ categorySlug }: { categorySlug: string }
               </Link>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   if (!window.confirm(`Delete “${p.name}”?`)) return;
-                  deleteProduct(p.id);
-                  toast.success("Product removed");
+                  try {
+                    const res = await fetch(`/api/admin/products/${encodeURIComponent(p.id)}`, { method: "DELETE" });
+                    if (!res.ok) throw new Error(await res.text());
+                    await refresh();
+                    toast.success("Product removed");
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "Delete failed");
+                  }
                 }}
                 className="text-[#E01F54] text-xs font-semibold hover:underline"
               >

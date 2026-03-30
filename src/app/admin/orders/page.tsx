@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { useAdminOrdersStore, type AdminOrder } from "@/store/useAdminOrdersStore";
+import type { AdminOrderRow } from "@/lib/admin-orders-map";
 
 const STATUS_OPTIONS = ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"];
 
@@ -15,14 +15,30 @@ const statusColors: Record<string, string> = {
 };
 
 export default function OrdersPage() {
-  const orders = useAdminOrdersStore((s) => s.orders);
-  const updateOrder = useAdminOrdersStore((s) => s.updateOrder);
-  const deleteOrder = useAdminOrdersStore((s) => s.deleteOrder);
+  const [orders, setOrders] = useState<AdminOrderRow[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [editing, setEditing] = useState<AdminOrder | null>(null);
-  const [form, setForm] = useState<Partial<AdminOrder>>({});
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch("/api/admin/orders", { cache: "no-store" });
+      const data = await r.json();
+      setOrders(data.orders ?? []);
+    } catch {
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const openEdit = (o: AdminOrder) => {
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const [editing, setEditing] = useState<AdminOrderRow | null>(null);
+  const [form, setForm] = useState<Partial<AdminOrderRow>>({});
+
+  const openEdit = (o: AdminOrderRow) => {
     setEditing(o);
     setForm({ ...o });
   };
@@ -32,25 +48,34 @@ export default function OrdersPage() {
     setForm({});
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editing) return;
-    updateOrder(editing.id, {
-      customer: form.customer ?? editing.customer,
-      email: form.email ?? editing.email,
-      total: form.total ?? editing.total,
-      status: form.status ?? editing.status,
-      date: form.date ?? editing.date,
-      items: Number(form.items ?? editing.items) || 0,
-    });
-    toast.success("Order updated");
-    closeEdit();
+    try {
+      const r = await fetch(`/api/admin/orders/${encodeURIComponent(editing.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: form.status ?? editing.status }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      toast.success("Order status updated");
+      closeEdit();
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Update failed");
+    }
   };
 
-  const handleDelete = (o: AdminOrder) => {
+  const handleDelete = async (o: AdminOrderRow) => {
     if (!window.confirm(`Delete order ${o.id}?`)) return;
-    deleteOrder(o.id);
-    toast.success("Order removed");
-    if (editing?.id === o.id) closeEdit();
+    try {
+      const r = await fetch(`/api/admin/orders/${encodeURIComponent(o.id)}`, { method: "DELETE" });
+      if (!r.ok) throw new Error(await r.text());
+      toast.success("Order removed");
+      if (editing?.id === o.id) closeEdit();
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Delete failed");
+    }
   };
 
   return (
@@ -58,7 +83,9 @@ export default function OrdersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-[#1A1A1A]">Orders</h2>
-          <p className="text-sm text-gray-500 mt-1">{orders.length} orders</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {loading ? "Loading…" : `${orders.length} orders`}
+          </p>
         </div>
         <button
           type="button"
@@ -109,7 +136,7 @@ export default function OrdersPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDelete(order)}
+                        onClick={() => void handleDelete(order)}
                         className="text-[#E01F54] text-xs font-semibold hover:underline"
                       >
                         Delete
@@ -127,51 +154,16 @@ export default function OrdersPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-[#1A1A1A]">Edit order</h3>
+              <h3 className="text-lg font-bold text-[#1A1A1A]">Edit order status</h3>
               <button type="button" onClick={closeEdit} className="text-gray-400 hover:text-[#1A1A1A] text-xl leading-none">
                 ×
               </button>
             </div>
             <p className="text-xs font-mono text-gray-500">{editing.id}</p>
+            <p className="text-xs text-gray-500">
+              Customer, totals, and date are shown from the database. Only status is saved from this dialog.
+            </p>
             <div className="grid gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Customer</label>
-                <input
-                  value={form.customer ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, customer: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={form.email ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Total</label>
-                  <input
-                    value={form.total ?? ""}
-                    onChange={(e) => setForm((f) => ({ ...f, total: e.target.value }))}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                    placeholder="CHF 0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Items</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.items ?? ""}
-                    onChange={(e) => setForm((f) => ({ ...f, items: Number(e.target.value) }))}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Status</label>
                 <select
@@ -186,26 +178,18 @@ export default function OrdersPage() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Date</label>
-                <input
-                  value={form.date ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                />
-              </div>
             </div>
             <div className="flex gap-3 pt-2">
               <button
                 type="button"
-                onClick={saveEdit}
+                onClick={() => void saveEdit()}
                 className="flex-1 rounded-full bg-[#E01F54] py-2.5 text-sm font-semibold text-white hover:bg-[#c01843]"
               >
-                Save
+                Save status
               </button>
               <button
                 type="button"
-                onClick={() => handleDelete(editing)}
+                onClick={() => void handleDelete(editing)}
                 className="rounded-full border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
               >
                 Delete

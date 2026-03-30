@@ -3,7 +3,7 @@
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { useMergedProducts } from "@/lib/useMergedCatalog";
-import { useCatalogExtensionsStore } from "@/store/useCatalogExtensionsStore";
+import { useCatalogStore } from "@/store/useCatalogStore";
 
 const categoryLabel: Record<string, string> = {
   fashion: "Fashion",
@@ -19,12 +19,18 @@ const categoryLabel: Record<string, string> = {
 
 export default function ProductsPage() {
   const products = useMergedProducts();
-  const deleteProduct = useCatalogExtensionsStore((s) => s.deleteProduct);
+  const refresh = useCatalogStore((s) => s.refresh);
 
-  const handleDelete = (id: string, name: string) => {
-    if (!window.confirm(`Delete “${name}” from the catalog? This browser only.`)) return;
-    deleteProduct(id);
-    toast.success("Product removed");
+  const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(`Delete “${name}” from the catalog? This removes it for all devices.`)) return;
+    try {
+      const r = await fetch(`/api/admin/products/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!r.ok) throw new Error(await r.text());
+      await refresh();
+      toast.success("Product removed");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Delete failed");
+    }
   };
 
   return (
@@ -68,7 +74,6 @@ export default function ProductsPage() {
                 const isLowStock = product.variants.some(
                   (v) => v.isAvailable && v.currentStock <= 5 && v.currentStock > 0
                 );
-                const isCustom = product.id.startsWith("custom-");
                 return (
                   <tr key={product.id} className="hover:bg-[#F7F7F7] transition-colors">
                     <td className="px-5 py-4">
@@ -84,9 +89,6 @@ export default function ProductsPage() {
                         <div>
                           <p className="font-semibold text-[#1A1A1A] line-clamp-1">{product.name}</p>
                           <p className="text-xs text-gray-400">{product.skuPrefix}</p>
-                          {isCustom && (
-                            <span className="text-[10px] font-bold text-[#007791] uppercase">Added locally</span>
-                          )}
                         </div>
                       </div>
                     </td>

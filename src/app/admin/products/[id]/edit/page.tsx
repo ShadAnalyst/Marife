@@ -5,12 +5,9 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { makeVariants, type MockProduct } from "@/lib/mockData";
-import {
-  useCatalogExtensionsStore,
-  resolveProductFromStore,
-} from "@/store/useCatalogExtensionsStore";
 import { useMergedProducts } from "@/lib/useMergedCatalog";
 import { useMergedCategories } from "@/lib/useMergedCatalog";
+import { useCatalogStore } from "@/store/useCatalogStore";
 import { ImageUploadField } from "@/components/admin/ImageUploadField";
 
 function slugify(input: string) {
@@ -27,17 +24,12 @@ export default function EditProductPage() {
   const rawId = params.id as string;
   const id = decodeURIComponent(rawId);
   const router = useRouter();
+  const refresh = useCatalogStore((s) => s.refresh);
 
-  const customProducts = useCatalogExtensionsStore((s) => s.customProducts);
-  const overrides = useCatalogExtensionsStore((s) => s.productOverrides);
-  const upsertProduct = useCatalogExtensionsStore((s) => s.upsertProduct);
   const mergedCategories = useMergedCategories();
   const mergedProducts = useMergedProducts();
 
-  const resolved = useMemo(
-    () => resolveProductFromStore(id, customProducts, overrides),
-    [id, customProducts, overrides]
-  );
+  const resolved = useMemo(() => mergedProducts.find((p) => p.id === id), [mergedProducts, id]);
 
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -78,7 +70,7 @@ export default function EditProductPage() {
     return Array.from(map.entries());
   }, [mergedCategories]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resolved) return;
     const s = slug.trim();
@@ -132,9 +124,19 @@ export default function EditProductPage() {
       variants: makeVariants(sku, sizeList),
     };
 
-    upsertProduct(updated);
-    toast.success("Product updated");
-    router.push("/admin/products");
+    try {
+      const res = await fetch(`/api/admin/products/${encodeURIComponent(resolved.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...updated, categorySlug }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await refresh();
+      toast.success("Product updated");
+      router.push("/admin/products");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Save failed");
+    }
   };
 
   if (!resolved) {

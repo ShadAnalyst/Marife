@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { MOCK_PRODUCTS } from "@/lib/mockData";
+import { useMergedProducts } from "@/lib/useMergedCatalog";
 import { formatCHF } from "@/lib/utils";
 import { ExclamationTriangleIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 
 export default function InventoryPage() {
   const [search, setSearch] = useState("");
+  const MOCK_PRODUCTS = useMergedProducts();
 
   const allVariants = MOCK_PRODUCTS.flatMap((p) =>
     p.variants.map((v) => ({

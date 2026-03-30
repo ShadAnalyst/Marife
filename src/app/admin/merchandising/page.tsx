@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { MOCK_CATEGORIES } from "@/lib/mockData";
-import { useCatalogExtensionsStore } from "@/store/useCatalogExtensionsStore";
 import { useMergedCategories } from "@/lib/useMergedCatalog";
+import { useCatalogStore } from "@/store/useCatalogStore";
 import { CategoryProductsAdmin } from "@/components/admin/CategoryProductsAdmin";
 import { ImageUploadField } from "@/components/admin/ImageUploadField";
 
@@ -31,10 +31,7 @@ function isBuiltInCategory(slug: string) {
 
 export default function MerchandisingPage() {
   const merged = useMergedCategories();
-  const addCategory = useCatalogExtensionsStore((s) => s.addCategory);
-  const updateCustomCategory = useCatalogExtensionsStore((s) => s.updateCustomCategory);
-  const setCategoryDisplayOverride = useCatalogExtensionsStore((s) => s.setCategoryDisplayOverride);
-  const deleteCategoryWithProducts = useCatalogExtensionsStore((s) => s.deleteCategoryWithProducts);
+  const refresh = useCatalogStore((s) => s.refresh);
 
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState<{
@@ -54,7 +51,7 @@ export default function MerchandisingPage() {
     if (!manualSlug) setSlug(slugify(name));
   }, [name, manualSlug]);
 
-  const handleAddCategory = (e: React.FormEvent) => {
+  const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     const n = name.trim();
     const s = slug.trim();
@@ -62,18 +59,28 @@ export default function MerchandisingPage() {
       toast.error("Name and slug are required");
       return;
     }
-    addCategory({
-      name: n,
-      slug: s,
-      imageUrl:
-        imageUrl.trim() ||
-        "https://marife.ch/media/a8/24/5d/1730145129/o_n20097_44_44_1_141.jpg",
-    });
-    toast.success("Category added");
-    setName("");
-    setSlug("");
-    setManualSlug(false);
-    setImageUrl("");
+    try {
+      const res = await fetch("/api/admin/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: n,
+          slug: s,
+          imageUrl:
+            imageUrl.trim() ||
+            "https://marife.ch/media/a8/24/5d/1730145129/o_n20097_44_44_1_141.jpg",
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await refresh();
+      toast.success("Category added");
+      setName("");
+      setSlug("");
+      setManualSlug(false);
+      setImageUrl("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
+    }
   };
 
   const openEdit = (cat: { slug: string; name: string; imageUrl: string }) => {
@@ -87,7 +94,7 @@ export default function MerchandisingPage() {
     });
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editOpen) return;
     const n = editOpen.name.trim();
     const s = editOpen.catSlug.trim().toLowerCase().replace(/\s+/g, "-");
@@ -96,24 +103,40 @@ export default function MerchandisingPage() {
       toast.error("Name and image are required");
       return;
     }
-    if (editOpen.builtIn) {
-      setCategoryDisplayOverride(editOpen.slug, { name: n, imageUrl: img });
-    } else {
-      updateCustomCategory(editOpen.slug, { name: n, slug: s, imageUrl: img });
+    try {
+      const res = await fetch(`/api/admin/categories/${encodeURIComponent(editOpen.slug)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          editOpen.builtIn
+            ? { name: n, imageUrl: img }
+            : { name: n, slug: s, imageUrl: img }
+        ),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await refresh();
+      toast.success("Category saved");
+      setEditOpen(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
     }
-    toast.success("Category saved");
-    setEditOpen(null);
   };
 
-  const removeCategory = (cat: { slug: string; name: string; imageUrl: string }) => {
+  const removeCategory = async (cat: { slug: string; name: string; imageUrl: string }) => {
     const builtIn = isBuiltInCategory(cat.slug);
     const msg = builtIn
-      ? `Hide category “${cat.name}” and remove all its products from the storefront?`
-      : `Delete category “${cat.name}” and all products in it?`;
+      ? `Hide category “${cat.name}” and deactivate all its products?`
+      : `Delete category “${cat.name}” and its products?`;
     if (!window.confirm(msg)) return;
-    deleteCategoryWithProducts(cat.slug);
-    toast.success(builtIn ? "Category hidden and products removed" : "Category deleted");
-    if (expanded === cat.slug) setExpanded(null);
+    try {
+      const res = await fetch(`/api/admin/categories/${encodeURIComponent(cat.slug)}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await res.text());
+      await refresh();
+      toast.success(builtIn ? "Category hidden and products deactivated" : "Category removed");
+      if (expanded === cat.slug) setExpanded(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
+    }
   };
 
   return (
@@ -298,7 +321,7 @@ export default function MerchandisingPage() {
             <div className="flex gap-3 pt-2">
               <button
                 type="button"
-                onClick={saveEdit}
+                onClick={() => void saveEdit()}
                 className="flex-1 rounded-full bg-[#E01F54] py-2.5 text-sm font-semibold text-white hover:bg-[#c01843]"
               >
                 Save

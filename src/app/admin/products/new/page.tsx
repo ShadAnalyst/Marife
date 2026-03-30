@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { MOCK_PRODUCTS, makeVariants, type MockProduct } from "@/lib/mockData";
-import { useCatalogExtensionsStore } from "@/store/useCatalogExtensionsStore";
-import { useMergedCategories } from "@/lib/useMergedCatalog";
+import { makeVariants, type MockProduct } from "@/lib/mockData";
+import { useMergedCategories, useMergedProducts } from "@/lib/useMergedCatalog";
+import { useCatalogStore } from "@/store/useCatalogStore";
 import { ImageUploadField } from "@/components/admin/ImageUploadField";
 
 function slugify(input: string) {
@@ -21,8 +21,8 @@ function slugify(input: string) {
 export default function NewProductPage() {
   const router = useRouter();
   const mergedCategories = useMergedCategories();
-  const addProduct = useCatalogExtensionsStore((s) => s.addProduct);
-  const customProducts = useCatalogExtensionsStore((s) => s.customProducts);
+  const mergedProducts = useMergedProducts();
+  const refresh = useCatalogStore((s) => s.refresh);
 
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -50,7 +50,7 @@ export default function NewProductPage() {
     return Array.from(map.entries());
   }, [mergedCategories]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const s = slug.trim();
     if (!name.trim() || !s) {
@@ -67,8 +67,7 @@ export default function NewProductPage() {
       toast.error("Invalid sale price");
       return;
     }
-    const taken =
-      MOCK_PRODUCTS.some((p) => p.slug === s) || customProducts.some((p) => p.slug === s);
+    const taken = mergedProducts.some((p) => p.slug === s);
     if (taken) {
       toast.error("A product with this slug already exists");
       return;
@@ -108,9 +107,19 @@ export default function NewProductPage() {
       variants: makeVariants(sku, sizeList),
     };
 
-    addProduct(product);
-    toast.success("Product saved (stored in this browser)");
-    router.push("/admin/products");
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...product, categorySlug }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await refresh();
+      toast.success("Product saved");
+      router.push("/admin/products");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Save failed");
+    }
   };
 
   return (
@@ -118,9 +127,7 @@ export default function NewProductPage() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-[#1A1A1A]">Add product</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Saves to local storage for this browser — pair with a database when you go live.
-          </p>
+          <p className="text-sm text-gray-500 mt-1">Saved to the shared database (visible on all devices).</p>
         </div>
         <Link href="/admin/products" className="text-sm font-semibold text-[#007791] hover:underline">
           ← Back
